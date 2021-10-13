@@ -70,6 +70,8 @@ Visualizing the data spatially using `mapview`.
 mapview(fire_perims,col.regions = "orange")
 ```
 
+This is running over leaflet and is a convenient way to view your spatial data.
+
 Occasionally I do not care about the spatial parts of a shapefile and I only want to recover the attributes. In the `sf` environment one can easily convert to a dataframe and de-select the spatial components.
 
 ```{r coerce to df}
@@ -77,6 +79,11 @@ fire_df <-
   data.frame(fire_perims) %>%
   select(-geometry)
 head(fire_df)
+
+#OR
+
+fire_df <-
+  st_drop_geometry(fire_perims)
 ```
 
 I could potentially take the above dataframe elsewhere, write it to a csv, and use it for something else.
@@ -86,6 +93,10 @@ Suppose we would like to know what kinds of fires there are in the data field `F
 ```{r distinct fire types}
 fire_df %>% 
   distinct(Fire_Type)
+
+fire_test <- fire_perims %>% 
+  distinct(Fire_Type)
+# Why doesn't this work??
 ```
 
 Perhaps we are unconcerned with "RX" fires, which are prescribed burns. We can remove them from our `sf` object using `dplyr::filter`.
@@ -109,7 +120,8 @@ We can retrieve the coordinate reference system of our `sf` object using `sf::st
 ```{r crs}
 st_crs(fire_perims)
 ```
-
+EPSG assigns a number to every map projection - 4269 is the NAD83 projection which you can look up. This is a universal numbering system. Datum (NAD83)
+If proj=longlat, the coordinates are not flat (they are in lat/long) so you need to somehow make it flat.
 By the output we see that the coordinates are unprojected and are instead in lat-long format. We can confirm this with a simple function.
 
 ```{r is lat long}
@@ -262,6 +274,12 @@ Visually there are many intersections. To identify which campgrounds were within
 ```{r test intersections}
 fire_intersects <-
   st_intersects(ca_nps_buffer,fire_proj)
+
+fire_intersections <- st_intersection(ca_nps_buffer, fire_proj)
+mapview(fire_intersections)
+
+mapview(ca_nps_buffer)+
+  mapview(fire_proj, color = "orange")
 ```
 
 This creates a listed data structure showing, for each of our 61 California National Parks sites, the index number of the fire that overlapped with it. For example, our first `ca_nps_buffer` entry, the Wawona campground in Yosemite, was affected by nine different fires, including fire number 144, the Rim Fire.
@@ -358,4 +376,29 @@ campgrounds_win_df <-
 
 There is much more to do with the `sf` package. A large part of the syntax is drawn from `gdal` functions, so it is generally easy to teach oneself to do new things because so much documentation exists. 
 
-One thing I did not cover was how to make maps (except in our interactive `mapview` outputs). For that I would again defer to Jamie Montgomery's [guide](https://github.com/jamiecmontgomery/spatial-analysis-R) on `sf`.
+One thing I did not cover was how to make maps (except in our interactive `mapview` outputs). For that I would again defer to Jamie Montgomery's [guide](https://github.com/jamiecmontgomery/spatial-analysis-R) on `sf`. Look here for info on making colorful maps and coding color into your map
+
+```{r mapping}
+library(ggplot2)
+
+ca <- read_sf("data/state/california2016.shp") #read in an outline for the state of california
+
+ggplot()+
+  geom_sf(data = ca)+
+  geom_sf(data = ca_nps, color = "darkgreen")+
+  geom_sf(data = fire_perims, color = "orange", fill = "orange", alpha = 0.5) #alpha sets transparency
+
+#should project california
+
+ca_proj <- ca %>% 
+  st_transform(crs = 3310) #CA albers
+ca_nps_proj <- ca_nps %>% 
+  st_transform(crs = 3310) #CA albers
+
+
+ggplot()+
+  geom_sf(data = ca_proj)+
+  geom_sf(data = ca_nps_proj, color = "darkgreen")+
+  geom_sf(data = fire_proj, color = "orange", fill = "orange", alpha = 0.5) #alpha sets transparency
+```
+
